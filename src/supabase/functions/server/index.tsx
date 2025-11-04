@@ -116,9 +116,13 @@ app.post("/make-server-78aacda0/donate", async (c) => {
       return c.json({ error: "Unauthorized - Invalid token" }, 401);
     }
 
-    const { donorName, age, gender, bloodGroup, weight } = await c.req.json();
+    const requestBody = await c.req.json();
+    console.log("Received donation request body:", requestBody);
     
-    if (!donorName || !age || !gender || !bloodGroup || !weight) {
+    const { donorName, age, gender, bloodGroup, weight, contactNumber, location } = requestBody;
+    
+    if (!donorName || !age || !gender || !bloodGroup || !weight || !contactNumber || !location) {
+      console.log("Missing required fields:", { donorName, age, gender, bloodGroup, weight, contactNumber, location });
       return c.json({ error: "All fields are required" }, 400);
     }
 
@@ -140,13 +144,20 @@ app.post("/make-server-78aacda0/donate", async (c) => {
       gender,
       bloodGroup,
       weight: weightNum,
+      contactNumber,
+      location,
       isEligible,
       timestamp: new Date().toISOString(),
     };
 
+    console.log("Storing donation:", donation);
+
     // Store donation only if eligible
     if (isEligible) {
       await kv.set(`donation:${user.id}:${Date.now()}`, donation);
+      console.log("Donation stored successfully");
+    } else {
+      console.log("Donation not stored - not eligible");
     }
 
     return c.json({ 
@@ -182,6 +193,11 @@ app.get("/make-server-78aacda0/stats", async (c) => {
 app.get("/make-server-78aacda0/recent-donors", async (c) => {
   try {
     const donations = await kv.getByPrefix("donation:");
+    console.log("Total donations retrieved:", donations.length);
+    
+    if (donations.length > 0) {
+      console.log("Sample donation data:", donations[0]);
+    }
     
     // Get donations from this week
     const oneWeekAgo = new Date();
@@ -194,6 +210,11 @@ app.get("/make-server-78aacda0/recent-donors", async (c) => {
       })
       .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10); // Top 10 recent donors
+    
+    console.log("Recent donations to return:", recentDonations.length);
+    if (recentDonations.length > 0) {
+      console.log("Sample recent donation:", recentDonations[0]);
+    }
     
     return c.json({ donors: recentDonations });
   } catch (error) {

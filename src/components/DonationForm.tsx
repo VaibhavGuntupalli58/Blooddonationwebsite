@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Droplet, User, Calendar, Users, Activity, Weight } from "lucide-react";
+import { Droplet, User, Calendar, Users, Activity, Weight, Phone, MapPin } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -29,12 +29,14 @@ export function DonationForm({ accessToken }: DonationFormProps) {
     gender: "",
     bloodGroup: "",
     weight: "",
+    contactNumber: "",
+    location: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.donorName || !formData.age || !formData.gender || !formData.bloodGroup || !formData.weight) {
+    if (!formData.donorName || !formData.age || !formData.gender || !formData.bloodGroup || !formData.weight || !formData.contactNumber || !formData.location) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -49,6 +51,8 @@ export function DonationForm({ accessToken }: DonationFormProps) {
 
     setSubmitting(true);
 
+    console.log("Submitting donation with data:", formData);
+
     try {
       const response = await axios.post(
         `https://${projectId}.supabase.co/functions/v1/make-server-78aacda0/donate`,
@@ -60,6 +64,8 @@ export function DonationForm({ accessToken }: DonationFormProps) {
           },
         }
       );
+      
+      console.log("Donation response:", response.data);
 
       if (response.data.success) {
         setIsEligible(response.data.isEligible);
@@ -92,6 +98,8 @@ export function DonationForm({ accessToken }: DonationFormProps) {
       gender: "",
       bloodGroup: "",
       weight: "",
+      contactNumber: "",
+      location: "",
     });
   };
 
@@ -330,6 +338,41 @@ export function DonationForm({ accessToken }: DonationFormProps) {
                   />
                 </div>
                 <p className="text-xs text-gray-500">Must be at least 60 kg</p>
+              </div>
+
+              {/* Contact Number */}
+              <div className="space-y-2">
+                <Label htmlFor="contactNumber">Contact Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="contactNumber"
+                    type="tel"
+                    placeholder="Enter your contact number"
+                    value={formData.contactNumber}
+                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="location"
+                    type="text"
+                    placeholder="Enter your city/area"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-gray-500">Enter your city or area name</p>
               </div>
 
               {/* Submit Button */}

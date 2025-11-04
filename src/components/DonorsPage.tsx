@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Droplet, Calendar, User } from "lucide-react";
+import { Droplet, Calendar, User, MapPin, Phone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import axios from "axios";
 import { projectId, publicAnonKey } from "../utils/supabase/info";
+import { DebugPanel } from "./DebugPanel";
 
 interface Donor {
   donorName: string;
@@ -12,11 +14,16 @@ interface Donor {
   timestamp: string;
   age: number;
   gender: string;
+  contactNumber: string;
+  location: string;
 }
 
 export function DonorsPage() {
   const [donors, setDonors] = useState<Donor[]>([]);
+  const [filteredDonors, setFilteredDonors] = useState<Donor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
 
   useEffect(() => {
     fetchRecentDonors();
@@ -32,11 +39,27 @@ export function DonorsPage() {
           },
         }
       );
-      setDonors(response.data.donors);
+      const donorsData = response.data.donors;
+      console.log("Fetched donors data:", donorsData);
+      setDonors(donorsData);
+      setFilteredDonors(donorsData);
+      
+      // Extract unique locations (filter out undefined/empty)
+      const locations = [...new Set(donorsData.map((d: Donor) => d.location).filter(Boolean))].sort();
+      setAvailableLocations(locations);
     } catch (error) {
       console.error("Error fetching recent donors:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLocationFilter = (location: string) => {
+    setSelectedLocation(location);
+    if (location === "all") {
+      setFilteredDonors(donors);
+    } else {
+      setFilteredDonors(donors.filter(d => d.location === location));
     }
   };
 
@@ -87,6 +110,66 @@ export function DonorsPage() {
           </p>
         </motion.div>
 
+        {/* Debug Info - Remove after testing */}
+        {!loading && donors.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="max-w-7xl mx-auto mb-4"
+          >
+            <Card className="border-2 border-blue-100 bg-blue-50">
+              <CardContent className="py-3">
+                <p className="text-xs text-blue-800">
+                  <strong>Debug Info:</strong> Total {donors.length} donor(s) found. 
+                  {donors.some(d => d.contactNumber && d.location) ? (
+                    <span className="text-green-700"> ✓ Some donors have phone & location data.</span>
+                  ) : (
+                    <span className="text-red-700"> ⚠ No donors have phone & location. Try submitting a new donation!</span>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Location Filter */}
+        {!loading && donors.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="max-w-7xl mx-auto mb-8"
+          >
+            <Card className="border-2 border-red-100">
+              <CardContent className="py-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <MapPin className="w-5 h-5 text-red-600" />
+                  <span className="text-gray-700">Filter by Location:</span>
+                  <Select value={selectedLocation} onValueChange={handleLocationFilter}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Locations ({donors.length})</SelectItem>
+                      {availableLocations.map((location) => (
+                        <SelectItem key={location} value={location}>
+                          {location} ({donors.filter(d => d.location === location).length})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedLocation !== "all" && (
+                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+                      {filteredDonors.length} donor(s) in {selectedLocation}
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Donors List */}
         {loading ? (
           <div className="text-center py-12">
@@ -109,9 +192,25 @@ export function DonorsPage() {
               </CardContent>
             </Card>
           </motion.div>
+        ) : filteredDonors.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="max-w-2xl mx-auto text-center py-12">
+              <CardContent>
+                <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-2xl mb-4 text-gray-700">No Donors in {selectedLocation}</h3>
+                <p className="text-gray-600">
+                  Try selecting a different location to find donors nearby.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-            {donors.map((donor, index) => (
+            {filteredDonors.map((donor, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
@@ -143,9 +242,43 @@ export function DonorsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
-                      <span>Donated on {formatDate(donor.timestamp)}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Calendar className="w-4 h-4" />
+                        <span>Donated on {formatDate(donor.timestamp)}</span>
+                      </div>
+                      
+                      {/* Location - More prominent */}
+                      <div className="flex items-center gap-2 p-2 bg-red-50 rounded-md border border-red-100">
+                        <MapPin className="w-5 h-5 text-red-600" />
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-500">Location</p>
+                          <p className="text-sm text-gray-900">
+                            {donor.location || "Location not provided"}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Phone Number - More prominent */}
+                      <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md border border-blue-100">
+                        <Phone className="w-5 h-5 text-blue-600" />
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-500">Contact</p>
+                          <p className="text-sm text-gray-900">
+                            {donor.contactNumber || "Phone not provided"}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Debug info - shows what fields exist */}
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
+                          🔍 Debug: View raw data
+                        </summary>
+                        <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto max-h-32">
+                          {JSON.stringify(donor, null, 2)}
+                        </pre>
+                      </details>
                     </div>
                   </CardContent>
                 </Card>
@@ -153,6 +286,11 @@ export function DonorsPage() {
             ))}
           </div>
         )}
+
+        {/* Debug Panel - TEMPORARY */}
+        <div className="max-w-7xl mx-auto">
+          <DebugPanel />
+        </div>
 
         {/* Thank You Section */}
         {donors.length > 0 && (
